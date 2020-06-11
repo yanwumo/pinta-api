@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "pinta-api"
+version = "0.0.1"
+description = "Job management on GPU clusters"
+authors = ["Pinta Team <pinta-l@usc.edu>"]
+packages = [{ include = "pinta"}]
+license = "AGPL-3.0"
+readme = "README.md"
+homepage = "https://qed.usc.edu/pinta"
+repository = "https://github.com/qed-usc/pinta"
+keywords = ["hpc", "gpu", "cluster", "scheduling"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Topic :: System :: Clustering",
+    "Topic :: System :: Distributed Computing"
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+click = "^7.1.2"
+rich = "^2.0.1"
+fastapi = "^0.55.1"
+uvicorn = "^0.11.5"
+python-jose = {extras = ["cryptography"], version = "^3.1.0"}
+SQLAlchemy = "^1.3.17"
+alembic = "^1.4.2"
+kubernetes = "^11.0.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+pudb = "^2019.2"
+pylint = "^2.5.3"
+pep8 = "^1.7.1"
+
+[tool.poetry.scripts]
+pinta-api = 'pinta.api.__main__:main'
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
