@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from pinta.api.api.api_v1.api import api_router
-from pinta.core.config import settings
+from pinta.api.core.config import settings
 
 app = FastAPI(title=settings.PROJECT_NAME,
               openapi_url=f"{settings.API_STR}/openapi.json")

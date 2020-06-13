@@ -7,7 +7,7 @@ import emails
 from emails.template import JinjaTemplate
 from jose import jwt
 
-from pinta.core.config import settings
+from pinta.api.core.config import settings
 
 
 def send_email(
