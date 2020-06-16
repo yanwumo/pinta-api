@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from pinta.api.api.api_v1.endpoints import login, users, utils, images, jobs
+from pinta.api.api.endpoints import utils, users, login, jobs
 
 api_router = APIRouter()
 api_router.include_router(login.router, tags=["login"])

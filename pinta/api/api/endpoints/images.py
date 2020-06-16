@@ -1,13 +1,11 @@
-from typing import Any, List
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from pinta.api import crud, models, schemas
+from pinta.api import models, schemas
 from pinta.api.api import deps
-from pinta.api.api.api_v1.endpoints.jobs import create_image_builder_job
-
-from kubernetes.client.rest import ApiException
+from pinta.api.api.endpoints.jobs import create_image_builder_job
 
 router = APIRouter()
 
