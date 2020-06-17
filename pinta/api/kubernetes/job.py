@@ -2,10 +2,14 @@ from kubernetes import client, config
 from .exec_client import stream
 
 from pinta.api.schemas.job import SymmetricJob, PSWorkerJob, MPIJob, ImageBuilderJob
+from pinta.api.core.config import settings
 
 
 def get_vcjob(id: int):
-    config.load_incluster_config()
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CustomObjectsApi()
     api_response = api.get_namespaced_custom_object(
         group="batch.volcano.sh",
@@ -18,7 +22,10 @@ def get_vcjob(id: int):
 
 
 def create_symmetric_vcjob(job_in: SymmetricJob, id: int):
-    config.load_incluster_config()
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CustomObjectsApi()
     tasks = [{
         "replicas": job_in.min_num_replicas,
@@ -60,7 +67,10 @@ def create_symmetric_vcjob(job_in: SymmetricJob, id: int):
 
 
 def create_ps_worker_vcjob(job_in: PSWorkerJob, id: int):
-    config.load_incluster_config()
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CustomObjectsApi()
     tasks = [{
         "replicas": 1,
@@ -116,11 +126,14 @@ def create_ps_worker_vcjob(job_in: PSWorkerJob, id: int):
 
 
 def create_mpi_vcjob(job_in: MPIJob, id: int):
-    config.load_incluster_config()
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CustomObjectsApi()
     tasks = [{
         "replicas": 1,
-        "name": "ps",
+        "name": "master",
         "template": {
             "spec": {
                 "containers": [{
@@ -134,7 +147,7 @@ def create_mpi_vcjob(job_in: MPIJob, id: int):
         }
     }, {
         "replicas": job_in.min_num_replicas,
-        "name": "worker",
+        "name": "replica",
         "template": {
             "spec": {
                 "containers": [{
@@ -172,7 +185,10 @@ def create_mpi_vcjob(job_in: MPIJob, id: int):
 
 
 def create_image_builder_vcjob(job_in: ImageBuilderJob, id: int):
-    config.load_incluster_config()
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CustomObjectsApi()
     tasks = [{
         "replicas": 1,
@@ -241,7 +257,10 @@ def create_image_builder_vcjob(job_in: ImageBuilderJob, id: int):
 
 
 def commit_image_builder(name: str, id: int, username: str):
-    config.load_incluster_config()
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CoreV1Api()
     exec_command = [
         "/bin/sh",

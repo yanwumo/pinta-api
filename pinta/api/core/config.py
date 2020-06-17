@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str
     USERS_OPEN_REGISTRATION: bool = False
 
+    K8S_DEBUG: bool = False
+
     class Config:
         case_sensitive = True
 
