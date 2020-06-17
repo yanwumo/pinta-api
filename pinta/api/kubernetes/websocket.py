@@ -6,6 +6,7 @@ from kubernetes import config, client
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from pinta.api.kubernetes.exec_client import stream
+from pinta.api.core.config import settings
 
 
 async def tunnel1(ws: WebSocket, resp: websockets.WebSocketClientProtocol):
@@ -20,11 +21,14 @@ async def tunnel2(resp: websockets.WebSocketClientProtocol, ws: WebSocket):
         await ws.send_bytes(data)
 
 
-async def proxy(ws: WebSocket, name: str, command: List[str], container: Optional[str] = None):
-    config.load_incluster_config()
+async def proxy(ws: WebSocket, pod: str, command: List[str], container: Optional[str] = None):
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
     api = client.CoreV1Api()
     call_args = stream(api.connect_get_namespaced_pod_exec,
-                       name=name,
+                       name=pod,
                        namespace="default",
                        command=command,
                        container=container,

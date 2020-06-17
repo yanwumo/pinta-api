@@ -312,7 +312,7 @@ async def exec_job(
 
     if job.type == "image_builder":
         args = dict(
-            name=f"pinta-job-{id}-image-builder-0",
+            pod=f"pinta-job-{id}-image-builder-0",
             container="docker-cli",
             command=[
                 "/bin/sh",
@@ -322,8 +322,9 @@ async def exec_job(
         )
     else:
         args = dict(
-            name=f"pinta-job-{id}-replica-0",
-            command=["/bin/sh"]
+            pod=f"pinta-job-{id}-replica-0",
+            command=["/bin/sh"],
+            tty=True
         )
 
     await websocket.accept()
@@ -331,3 +332,17 @@ async def exec_job(
         await proxy(websocket, **args)
     finally:
         await websocket.close()
+
+
+# @router.websocket("/ws")
+# async def test_websocket(websocket: WebSocket):
+#     args = dict(
+#         pod="nginx",
+#         command=['tar', 'cf', '-', '/empty.txt']
+#     )
+#
+#     await websocket.accept()
+#     try:
+#         await proxy(websocket, **args)
+#     finally:
+#         await websocket.close()
