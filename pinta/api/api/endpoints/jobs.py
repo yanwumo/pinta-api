@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from pinta.api import crud, models, schemas
 from pinta.api.api import deps
 
-from pinta.api.kubernetes.job import get_vcjob, create_vcjob, create_image_builder_vcjob, commit_image_builder, proxy
+from pinta.api.kubernetes.job import get_vcjob, create_symmetric_vcjob, create_ps_worker_vcjob, create_mpi_vcjob, create_image_builder_vcjob, commit_image_builder
+from pinta.api.kubernetes.websocket import proxy
 from kubernetes.client.rest import ApiException
 
 router = APIRouter()
@@ -55,10 +56,65 @@ def create_job(
     """
     Create a new job with symmetric node configurations.
     """
-    job = crud.job.create_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
+    return create_symmetric_job(db=db, job_in=job_in, current_user=current_user)
+
+
+@router.post("/symmetric", response_model=schemas.Job)
+def create_symmetric_job(
+    *,
+    db: Session = Depends(deps.get_db),
+    job_in: schemas.SymmetricJob,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Create a new job with symmetric node configurations.
+    """
+    job = crud.job.create_symmetric_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
-            create_vcjob(job_in=job_in, id=job.id)
+            create_symmetric_vcjob(job_in=job_in, id=job.id)
+        except ApiException as e:
+            print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
+            job = crud.job.remove(db=db, id=job.id)
+            raise
+    return job
+
+
+@router.post("/ps_worker", response_model=schemas.Job)
+def create_ps_worker_job(
+    *,
+    db: Session = Depends(deps.get_db),
+    job_in: schemas.PSWorkerJob,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Create a new job with parameter server and workers.
+    """
+    job = crud.job.create_ps_worker_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
+    if job_in.scheduled:
+        try:
+            create_ps_worker_vcjob(job_in=job_in, id=job.id)
+        except ApiException as e:
+            print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
+            job = crud.job.remove(db=db, id=job.id)
+            raise
+    return job
+
+
+@router.post("/mpi", response_model=schemas.Job)
+def create_mpi_job(
+    *,
+    db: Session = Depends(deps.get_db),
+    job_in: schemas.MPIJob,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Create a new job with master and replica node configurations, which are typically used by MPI.
+    """
+    job = crud.job.create_mpi_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
+    if job_in.scheduled:
+        try:
+            create_mpi_vcjob(job_in=job_in, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
             job = crud.job.remove(db=db, id=job.id)
@@ -107,7 +163,7 @@ def update_job(
         raise HTTPException(status_code=400, detail="Job already scheduled")
     if job_in.scheduled:
         try:
-            create_vcjob(job_in=job_in, id=job.id)
+            create_symmetric_vcjob(job_in=job_in, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
             job_in.scheduled = False
@@ -184,7 +240,7 @@ def schedule_job(
     if job.scheduled:
         raise HTTPException(status_code=400, detail="Job already scheduled")
     try:
-        create_vcjob(job_in=job, id=job.id)
+        create_symmetric_vcjob(job_in=job, id=job.id)
     except ApiException as e:
         print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
         raise

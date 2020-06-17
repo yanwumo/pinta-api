@@ -38,8 +38,62 @@ class SymmetricJobSpec(BaseModel):
 
 class SymmetricJob(SymmetricJobSpec, JobBase):
     """
-    All nodes in the symmetric job have identical configuration,
+    All nodes in a symmetric job have identical configuration,
     with the only difference being node index.
+    """
+    pass
+
+
+class PSWorkerJobSpec(BaseModel):
+    """
+    Specification of a ps-worker job.
+    """
+    image: str = Field(..., description="Image deployed when the job runs, possibly with tags. It can be a docker "
+                                        "image from a publicly available repository (e.g., alpine:latest, "
+                                        "tensorflow/tensorflow), or an image that is created and stored in the "
+                                        "system.")
+    from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
+    working_dir: str = Field(..., description="Working directory when running the command.")
+    ps_command: str = Field(..., description="Command to run on parameter server.")
+    worker_command: str = Field(..., description="Command to run on worker.")
+    min_num_workers: int
+    max_num_workers: int
+    ports: str = Field(..., description="Ports to expose.")
+    scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
+                                              "change later on. If set to true, job will be immediately queued to "
+                                              "the system, waiting to be scheduled.")
+
+
+class PSWorkerJob(PSWorkerJobSpec, JobBase):
+    """
+    There are two types of nodes in a ps-worker job: parameter server and worker.
+    """
+    pass
+
+
+class MPIJobSpec(BaseModel):
+    """
+    Specification of an MPI job.
+    """
+    image: str = Field(..., description="Image deployed when the job runs, possibly with tags. It can be a docker "
+                                        "image from a publicly available repository (e.g., alpine:latest, "
+                                        "tensorflow/tensorflow), or an image that is created and stored in the "
+                                        "system.")
+    from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
+    working_dir: str = Field(..., description="Working directory when running the command.")
+    master_command: str = Field(..., description="Command to run on master.")
+    replica_command: str = Field(..., description="Command to run on replica.")
+    min_num_replicas: int
+    max_num_replicas: int
+    ports: str = Field(..., description="Ports to expose.")
+    scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
+                                              "change later on. If set to true, job will be immediately queued to "
+                                              "the system, waiting to be scheduled.")
+
+
+class MPIJob(MPIJobSpec, JobBase):
+    """
+    There are two types of nodes in an MPI job: master and replicas.
     """
     pass
 

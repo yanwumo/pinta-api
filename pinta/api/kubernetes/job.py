@@ -1,13 +1,7 @@
 from kubernetes import client, config
 from .exec_client import stream
-from typing import Optional, List
 
-from pinta.api.schemas.job import SymmetricJob, ImageBuilderJob
-from fastapi import WebSocket
-from starlette.websockets import WebSocketDisconnect
-
-import websockets
-import asyncio
+from pinta.api.schemas.job import SymmetricJob, PSWorkerJob, MPIJob, ImageBuilderJob
 
 
 def get_vcjob(id: int):
@@ -23,7 +17,7 @@ def get_vcjob(id: int):
     return api_response
 
 
-def create_vcjob(job_in: SymmetricJob, id: int):
+def create_symmetric_vcjob(job_in: SymmetricJob, id: int):
     config.load_incluster_config()
     api = client.CustomObjectsApi()
     tasks = [{
@@ -49,6 +43,118 @@ def create_vcjob(job_in: SymmetricJob, id: int):
         },
         "spec": {
             "minAvailable": job_in.min_num_replicas,
+            "schedulerName": "volcano",
+            "plugins": {"env": [], "svc": []},
+            "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
+            "tasks": tasks
+        }
+    }
+    api_response = api.create_namespaced_custom_object(
+        group="batch.volcano.sh",
+        version="v1alpha1",
+        namespace="default",
+        plural="jobs",
+        body=vcjob
+    )
+    return api_response
+
+
+def create_ps_worker_vcjob(job_in: PSWorkerJob, id: int):
+    config.load_incluster_config()
+    api = client.CustomObjectsApi()
+    tasks = [{
+        "replicas": 1,
+        "name": "ps",
+        "template": {
+            "spec": {
+                "containers": [{
+                    "name": "pinta-image",
+                    "image": job_in.image,
+                    "workingDir": job_in.working_dir,
+                    "command": ["sh", "-c", job_in.ps_command],
+                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+                }]
+            }
+        }
+    }, {
+        "replicas": job_in.min_num_workers,
+        "name": "worker",
+        "template": {
+            "spec": {
+                "containers": [{
+                    "name": "pinta-image",
+                    "image": job_in.image,
+                    "workingDir": job_in.working_dir,
+                    "command": ["sh", "-c", job_in.worker_command],
+                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+                }]
+            }
+        }
+    }]
+    vcjob = {
+        "apiVersion": "batch.volcano.sh/v1alpha1",
+        "kind": "Job",
+        "metadata": {
+            "name": "pinta-job-" + str(id)
+        },
+        "spec": {
+            "minAvailable": 1 + job_in.min_num_workers,
+            "schedulerName": "volcano",
+            "plugins": {"env": [], "svc": []},
+            "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
+            "tasks": tasks
+        }
+    }
+    api_response = api.create_namespaced_custom_object(
+        group="batch.volcano.sh",
+        version="v1alpha1",
+        namespace="default",
+        plural="jobs",
+        body=vcjob
+    )
+    return api_response
+
+
+def create_mpi_vcjob(job_in: MPIJob, id: int):
+    config.load_incluster_config()
+    api = client.CustomObjectsApi()
+    tasks = [{
+        "replicas": 1,
+        "name": "ps",
+        "template": {
+            "spec": {
+                "containers": [{
+                    "name": "pinta-image",
+                    "image": job_in.image,
+                    "workingDir": job_in.working_dir,
+                    "command": ["sh", "-c", job_in.master_command],
+                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+                }]
+            }
+        }
+    }, {
+        "replicas": job_in.min_num_replicas,
+        "name": "worker",
+        "template": {
+            "spec": {
+                "containers": [{
+                    "name": "pinta-image",
+                    "image": job_in.image,
+                    "workingDir": job_in.working_dir,
+                    "command": ["sh", "-c", job_in.replica_command],
+                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+                }]
+            }
+        }
+    }]
+    vcjob = {
+        "apiVersion": "batch.volcano.sh/v1alpha1",
+        "kind": "Job",
+        "metadata": {
+            "name": "pinta-job-" + str(id)
+        },
+        "spec": {
+            "minAvailable": 1 + job_in.min_num_replicas,
             "schedulerName": "volcano",
             "plugins": {"env": [], "svc": []},
             "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
@@ -162,38 +268,3 @@ def commit_image_builder(name: str, id: int, username: str):
         name="pinta-job-" + str(id)
     )
     return api_response
-
-
-async def tunnel1(ws: WebSocket, resp: websockets.WebSocketClientProtocol):
-    while True:
-        data = await ws.receive_bytes()
-        await resp.send(data)
-
-
-async def tunnel2(resp: websockets.WebSocketClientProtocol, ws: WebSocket):
-    terminate = False
-    while not terminate:
-        data = await resp.recv()
-        await ws.send_bytes(data)
-
-
-async def proxy(ws: WebSocket, name: str, command: List[str], container: Optional[str] = None):
-    config.load_incluster_config()
-    api = client.CoreV1Api()
-    call_args = stream(api.connect_get_namespaced_pod_exec,
-                       name=name,
-                       namespace="default",
-                       command=command,
-                       container=container,
-                       stderr=True, stdin=True,
-                       stdout=True, tty=True,
-                       _preload_content=False)
-    async with websockets.connect(**call_args) as resp:
-        t1 = asyncio.create_task(tunnel1(ws, resp))
-        t2 = asyncio.create_task(tunnel2(resp, ws))
-        try:
-            await asyncio.gather(t1, t2)
-        except websockets.exceptions.ConnectionClosedOK:
-            pass
-        except WebSocketDisconnect:
-            pass
