@@ -149,6 +149,9 @@ class JobInDBBase(BaseModel):
     min_num_replicas: Optional[int] = None
     max_num_replicas: Optional[int] = None
     ports: Optional[str] = None
+    scheduled: Optional[bool] = Field(None, description="If set to false, job will be put into pending state. Use PATCH to "
+                                              "change later on. If set to true, job will be immediately queued to "
+                                              "the system, waiting to be scheduled.")
 
     class Config:
         orm_mode = True
