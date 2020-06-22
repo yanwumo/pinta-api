@@ -248,29 +248,67 @@ def schedule_job(
     return job
 
 
-@router.post("/{id}/commit", response_model=schemas.Job)
-def commit_job(
+# WebSocket interfaces
+class Headers:
+    def __init__(self, auth):
+        self.auth = auth
+
+    def get(self, _):
+        return self.auth
+
+
+class Request:
+    def __init__(self, auth):
+        self.headers = Headers(auth)
+
+
+@router.websocket("/{id}/commit")
+async def commit_image_builder_job(
     *,
+    websocket: WebSocket,
     db: Session = Depends(deps.get_db),
     id: int,
     image_name: str,
-    current_user: models.User = Depends(deps.get_current_active_user),
-) -> Any:
+    authorization: str
+):
     """
     Commit an image.
     """
-    job = crud.job.get(db=db, id=id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if not crud.user.is_superuser(current_user) and (job.owner_id != current_user.id):
-        raise HTTPException(status_code=400, detail="Not enough permissions")
-    if job.type != "image_builder":
-        raise HTTPException(status_code=400, detail="Job is not an image builder")
-    if not job.scheduled:
-        raise HTTPException(status_code=400, detail="Image builder job not scheduled")
-    commit_image_builder(name=image_name, id=id, username=current_user.email)
-    job = crud.job.remove(db=db, id=id)
-    return job
+    await websocket.accept()
+    try:
+        request = Request(authorization)
+        param = await deps.reusable_oauth2(request)
+        current_user: models.User = deps.get_current_active_user(deps.get_current_user(db=db, token=param))
+
+        job = crud.job.get(db=db, id=id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if not crud.user.is_superuser(current_user) and (job.owner_id != current_user.id):
+            raise HTTPException(status_code=400, detail="Not enough permissions")
+        if job.type != "image_builder":
+            raise HTTPException(status_code=400, detail="Job is not an image builder")
+        if not job.scheduled:
+            raise HTTPException(status_code=400, detail="Image builder job not scheduled")
+
+        args = dict(
+            pod=f"pinta-job-{id}-image-builder-0",
+            container="docker-cli",
+            command=[
+                "/bin/sh",
+                "-c",
+                "docker login; "
+                f"docker commit image-builder-container registry-service.pinta-system.svc:5000/{current_user.full_name}/{image_name}; "
+                f"docker push registry-service.pinta-system.svc:5000/{current_user.full_name}/{image_name}"
+            ]
+        )
+        await proxy(websocket, **args)
+        await websocket.close()
+
+        job = crud.job.remove(db=db, id=id)
+    except HTTPException as e:
+        # Redirect HTTPException information to channel 3 (ERROR_CHANNEL)
+        await websocket.send_bytes(bytes([3]) + f"HTTP {e.status_code}: {e.detail}".encode())
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
 
 
 @router.websocket("/{id}/exec")
@@ -281,57 +319,42 @@ async def exec_job(
     id: int,
     authorization: str
 ):
-    class Headers:
-        def __init__(self, auth):
-            self.auth = auth
-
-        def get(self, _):
-            return self.auth
-
-    class Request:
-        def __init__(self, auth):
-            self.headers = Headers(auth)
-
-    request = Request(authorization)
-    param = await deps.reusable_oauth2(request)
-    current_user: models.User = deps.get_current_active_user(deps.get_current_user(db=db, token=param))
-
-    job = crud.job.get(db=db, id=id)
-    if not job:
-        # raise HTTPException(status_code=404, detail="Job not found")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-    if not crud.user.is_superuser(current_user) and (job.owner_id != current_user.id):
-        # raise HTTPException(status_code=400, detail="Not enough permissions")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-    if not job.scheduled:
-        # raise HTTPException(status_code=400, detail="Job not scheduled")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    if job.type == "image_builder":
-        args = dict(
-            pod=f"pinta-job-{id}-image-builder-0",
-            container="docker-cli",
-            command=[
-                "/bin/sh",
-                "-c",
-                f"docker exec -it image-builder-container /bin/sh; exit"
-            ]
-        )
-    else:
-        args = dict(
-            pod=f"pinta-job-{id}-replica-0",
-            command=["/bin/sh"],
-            tty=True
-        )
-
     await websocket.accept()
     try:
+        request = Request(authorization)
+        param = await deps.reusable_oauth2(request)
+        current_user: models.User = deps.get_current_active_user(deps.get_current_user(db=db, token=param))
+
+        job = crud.job.get(db=db, id=id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if not crud.user.is_superuser(current_user) and (job.owner_id != current_user.id):
+            raise HTTPException(status_code=400, detail="Not enough permissions")
+        if not job.scheduled:
+            raise HTTPException(status_code=400, detail="Job not scheduled")
+
+        if job.type == "image_builder":
+            args = dict(
+                pod=f"pinta-job-{id}-image-builder-0",
+                container="docker-cli",
+                command=[
+                    "/bin/sh",
+                    "-c",
+                    f"docker exec -it image-builder-container /bin/sh; exit"
+                ]
+            )
+        else:
+            args = dict(
+                pod=f"pinta-job-{id}-replica-0",
+                command=["/bin/sh"],
+                tty=True
+            )
         await proxy(websocket, **args)
-    finally:
         await websocket.close()
+    except HTTPException as e:
+        # Redirect HTTPException information to channel 3 (ERROR_CHANNEL)
+        await websocket.send_bytes(bytes([3]) + f"HTTP {e.status_code}: {e.detail}".encode())
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
 
 
 # @router.websocket("/ws")
