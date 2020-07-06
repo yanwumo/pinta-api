@@ -21,7 +21,7 @@ async def tunnel2(resp: websockets.WebSocketClientProtocol, ws: WebSocket):
         await ws.send_bytes(data)
 
 
-async def proxy(ws: WebSocket, pod: str, command: List[str], container: Optional[str] = None):
+async def proxy(ws: WebSocket, pod: str, command: List[str], tty: bool, container: Optional[str] = None):
     if settings.K8S_DEBUG:
         config.load_kube_config()
     else:
@@ -33,7 +33,7 @@ async def proxy(ws: WebSocket, pod: str, command: List[str], container: Optional
                        command=command,
                        container=container,
                        stderr=True, stdin=True,
-                       stdout=True, tty=True,
+                       stdout=True, tty=tty,
                        _preload_content=False)
     async with websockets.connect(**call_args) as resp:
         t1 = asyncio.create_task(tunnel1(ws, resp))

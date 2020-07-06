@@ -299,7 +299,8 @@ async def commit_image_builder_job(
                 "docker login; "
                 f"docker commit image-builder-container registry-service.pinta-system.svc:5000/{current_user.full_name}/{image_name}; "
                 f"docker push registry-service.pinta-system.svc:5000/{current_user.full_name}/{image_name}"
-            ]
+            ],
+            tty=True
         )
         await proxy(websocket, **args)
         await websocket.close()
@@ -317,6 +318,8 @@ async def exec_job(
     websocket: WebSocket,
     db: Session = Depends(deps.get_db),
     id: int,
+    tty: bool,
+    command: str,
     authorization: str
 ):
     await websocket.accept()
@@ -340,14 +343,19 @@ async def exec_job(
                 command=[
                     "/bin/sh",
                     "-c",
-                    f"docker exec -it image-builder-container /bin/sh; exit"
-                ]
+                    f"docker exec {'-it' if tty else ''} image-builder-container {command}; exit"
+                ],
+                tty=tty
             )
         else:
             args = dict(
                 pod=f"pinta-job-{id}-replica-0",
-                command=["/bin/sh"],
-                tty=True
+                command=[
+                    "/bin/sh",
+                    "-c",
+                    command
+                ],
+                tty=tty
             )
         await proxy(websocket, **args)
         await websocket.close()
