@@ -312,6 +312,31 @@ async def commit_image_builder_job(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
 
 
+@router.post("/{id}/commit", response_model=schemas.Job)
+def commit_job(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    image_name: str,
+    current_user: models.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Commit an image.
+    """
+    job = crud.job.get(db=db, id=id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not crud.user.is_superuser(current_user) and (job.owner_id != current_user.id):
+        raise HTTPException(status_code=400, detail="Not enough permissions")
+    if job.type != "image_builder":
+        raise HTTPException(status_code=400, detail="Job is not an image builder")
+    if not job.scheduled:
+        raise HTTPException(status_code=400, detail="Image builder job not scheduled")
+    commit_image_builder(name=image_name, id=id, username=current_user.email)
+    job = crud.job.remove(db=db, id=id)
+    return job
+
+
 @router.websocket("/{id}/exec")
 async def exec_job(
     *,
@@ -343,7 +368,7 @@ async def exec_job(
                 command=[
                     "/bin/sh",
                     "-c",
-                    f"docker exec {'-it' if tty else ''} image-builder-container {command}; exit"
+                    f"docker exec -i{'t' if tty else ''} image-builder-container {command}; exit"
                 ],
                 tty=tty
             )
