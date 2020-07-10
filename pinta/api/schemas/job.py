@@ -28,8 +28,7 @@ class SymmetricJobSpec(BaseModel):
     from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
     working_dir: str = Field(..., description="Working directory when running the command.")
     command: str = Field(..., description="Command to run.")
-    min_num_replicas: int
-    max_num_replicas: int
+    num_replicas: int
     ports: str = Field(..., description="Ports to expose.")
     scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to change"
                                               "later on. If set to true, job will be immediately queued to the system, "
@@ -56,8 +55,8 @@ class PSWorkerJobSpec(BaseModel):
     working_dir: str = Field(..., description="Working directory when running the command.")
     ps_command: str = Field(..., description="Command to run on parameter server.")
     worker_command: str = Field(..., description="Command to run on worker.")
-    min_num_workers: int
-    max_num_workers: int
+    num_ps: int
+    num_workers: int
     ports: str = Field(..., description="Ports to expose.")
     scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
                                               "change later on. If set to true, job will be immediately queued to "
@@ -83,8 +82,7 @@ class MPIJobSpec(BaseModel):
     working_dir: str = Field(..., description="Working directory when running the command.")
     master_command: str = Field(..., description="Command to run on master.")
     replica_command: str = Field(..., description="Command to run on replica.")
-    min_num_replicas: int
-    max_num_replicas: int
+    num_replicas: int
     ports: str = Field(..., description="Ports to expose.")
     scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
                                               "change later on. If set to true, job will be immediately queued to "
@@ -146,8 +144,8 @@ class JobInDBBase(BaseModel):
     working_dir: Optional[str] = Field(None, description="Working directory when running the command.")
     master_command: Optional[str] = None
     replica_command: Optional[str] = None
-    min_num_replicas: Optional[int] = None
-    max_num_replicas: Optional[int] = None
+    num_masters: Optional[int] = None
+    num_replicas: Optional[int] = None
     ports: Optional[str] = None
     scheduled: Optional[bool] = Field(None, description="If set to false, job will be put into pending state. Use PATCH to "
                                               "change later on. If set to true, job will be immediately queued to "

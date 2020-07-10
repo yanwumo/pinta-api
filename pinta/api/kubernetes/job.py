@@ -21,237 +21,211 @@ def get_vcjob(id: int):
     return api_response
 
 
-def create_symmetric_vcjob(job_in: SymmetricJob, id: int):
+def create_symmetric_pintajob(job_in: SymmetricJob, id: int):
     if settings.K8S_DEBUG:
         config.load_kube_config()
     else:
         config.load_incluster_config()
     api = client.CustomObjectsApi()
-    tasks = [{
-        "replicas": job_in.min_num_replicas,
-        "name": "replica",
-        "template": {
-            "spec": {
-                "containers": [{
-                    "name": "pinta-image",
-                    "image": job_in.image,
-                    "workingDir": job_in.working_dir,
-                    "command": ["sh", "-c", job_in.command],
-                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-                }]
-            }
+    replica = {
+        "spec": {
+            "containers": [{
+                "name": "pinta-image",
+                "image": job_in.image,
+                "workingDir": job_in.working_dir,
+                "command": ["sh", "-c", job_in.command],
+                "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+            }]
         }
-    }]
-    vcjob = {
-        "apiVersion": "batch.volcano.sh/v1alpha1",
-        "kind": "Job",
+    }
+    ptjob = {
+        "apiVersion": "pinta.qed.usc.edu/v1",
+        "kind": "PintaJob",
         "metadata": {
             "name": "pinta-job-" + str(id)
         },
         "spec": {
-            "minAvailable": job_in.min_num_replicas,
-            "schedulerName": "volcano",
-            "plugins": {"env": [], "svc": []},
-            "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
-            "tasks": tasks
+            "type": "symmetric",
+            "replica": replica,
+            "numReplicas": job_in.num_replicas
         }
     }
     api_response = api.create_namespaced_custom_object(
-        group="batch.volcano.sh",
-        version="v1alpha1",
+        group="pinta.qed.usc.edu",
+        version="v1",
         namespace="default",
-        plural="jobs",
-        body=vcjob
+        plural="pintajobs",
+        body=ptjob
     )
     return api_response
 
 
-def create_ps_worker_vcjob(job_in: PSWorkerJob, id: int):
+def create_ps_worker_pintajob(job_in: PSWorkerJob, id: int):
     if settings.K8S_DEBUG:
         config.load_kube_config()
     else:
         config.load_incluster_config()
     api = client.CustomObjectsApi()
-    tasks = [{
-        "replicas": 1,
-        "name": "ps",
-        "template": {
-            "spec": {
-                "containers": [{
-                    "name": "pinta-image",
-                    "image": job_in.image,
-                    "workingDir": job_in.working_dir,
-                    "command": ["sh", "-c", job_in.ps_command],
-                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-                }]
-            }
+    master = {
+        "spec": {
+            "containers": [{
+                "name": "ps",
+                "image": job_in.image,
+                "workingDir": job_in.working_dir,
+                "command": ["sh", "-c", job_in.ps_command],
+                "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+            }]
         }
-    }, {
-        "replicas": job_in.min_num_workers,
-        "name": "worker",
-        "template": {
-            "spec": {
-                "containers": [{
-                    "name": "pinta-image",
-                    "image": job_in.image,
-                    "workingDir": job_in.working_dir,
-                    "command": ["sh", "-c", job_in.worker_command],
-                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-                }]
-            }
+    }
+    replica = {
+        "spec": {
+            "containers": [{
+                "name": "worker",
+                "image": job_in.image,
+                "workingDir": job_in.working_dir,
+                "command": ["sh", "-c", job_in.worker_command],
+                "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+            }]
         }
-    }]
-    vcjob = {
-        "apiVersion": "batch.volcano.sh/v1alpha1",
-        "kind": "Job",
+    }
+    ptjob = {
+        "apiVersion": "pinta.qed.usc.edu/v1",
+        "kind": "PintaJob",
         "metadata": {
             "name": "pinta-job-" + str(id)
         },
         "spec": {
-            "minAvailable": 1 + job_in.min_num_workers,
-            "schedulerName": "volcano",
-            "plugins": {"env": [], "svc": []},
-            "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
-            "tasks": tasks
+            "type": "ps-worker",
+            "master": master,
+            "replica": replica,
+            "numMasters": job_in.num_ps,
+            "numReplicas": job_in.num_workers
         }
     }
     api_response = api.create_namespaced_custom_object(
-        group="batch.volcano.sh",
-        version="v1alpha1",
+        group="pinta.qed.usc.edu",
+        version="v1",
         namespace="default",
-        plural="jobs",
-        body=vcjob
+        plural="pintajobs",
+        body=ptjob
     )
     return api_response
 
 
-def create_mpi_vcjob(job_in: MPIJob, id: int):
+def create_mpi_pintajob(job_in: MPIJob, id: int):
     if settings.K8S_DEBUG:
         config.load_kube_config()
     else:
         config.load_incluster_config()
     api = client.CustomObjectsApi()
-    tasks = [{
-        "replicas": 1,
-        "name": "master",
-        "template": {
-            "spec": {
-                "containers": [{
-                    "name": "pinta-image",
-                    "image": job_in.image,
-                    "workingDir": job_in.working_dir,
-                    "command": ["sh", "-c", job_in.master_command],
-                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-                }]
-            }
+    master = {
+        "spec": {
+            "containers": [{
+                "name": "master",
+                "image": job_in.image,
+                "workingDir": job_in.working_dir,
+                "command": ["sh", "-c", job_in.master_command],
+                "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+            }]
         }
-    }, {
-        "replicas": job_in.min_num_replicas,
-        "name": "replica",
-        "template": {
-            "spec": {
-                "containers": [{
-                    "name": "pinta-image",
-                    "image": job_in.image,
-                    "workingDir": job_in.working_dir,
-                    "command": ["sh", "-c", job_in.replica_command],
-                    "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-                }]
-            }
+    }
+    replica = {
+        "spec": {
+            "containers": [{
+                "name": "replica",
+                "image": job_in.image,
+                "workingDir": job_in.working_dir,
+                "command": ["sh", "-c", job_in.replica_command],
+                "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
+            }]
         }
-    }]
-    vcjob = {
-        "apiVersion": "batch.volcano.sh/v1alpha1",
-        "kind": "Job",
+    }
+    ptjob = {
+        "apiVersion": "pinta.qed.usc.edu/v1",
+        "kind": "PintaJob",
         "metadata": {
             "name": "pinta-job-" + str(id)
         },
         "spec": {
-            "minAvailable": 1 + job_in.min_num_replicas,
-            "schedulerName": "volcano",
-            "plugins": {"env": [], "svc": []},
-            "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
-            "tasks": tasks
+            "type": "mpi",
+            "master": master,
+            "replica": replica,
+            "numMasters": 1,
+            "numReplicas": job_in.num_replicas
         }
     }
     api_response = api.create_namespaced_custom_object(
-        group="batch.volcano.sh",
-        version="v1alpha1",
+        group="pinta.qed.usc.edu",
+        version="v1",
         namespace="default",
-        plural="jobs",
-        body=vcjob
+        plural="pintajobs",
+        body=ptjob
     )
     return api_response
 
 
-def create_image_builder_vcjob(job_in: ImageBuilderJob, id: int):
+def create_image_builder_pintajob(job_in: ImageBuilderJob, id: int):
     if settings.K8S_DEBUG:
         config.load_kube_config()
     else:
         config.load_incluster_config()
     api = client.CustomObjectsApi()
-    tasks = [{
-        "replicas": 1,
-        "name": "image-builder",
-        "template": {
-            "spec": {
-                "containers": [
-                    {
-                        "name": "dockerd",
-                        "image": "docker:stable-dind",
-                        "securityContext": {"privileged": True},
-                        "command": ["dockerd", "--host=tcp://0.0.0.0:2375"],
-                        "volumeMounts": [{
-                            "name": "config-volume",
-                            "mountPath": "/etc/docker/daemon.json",
-                            "subPath": "daemon.json"
-                        }]
-                    },
-                    {
-                        "name": "docker-cli",
-                        "image": "docker:stable",
-                        "env": [{"name": "DOCKER_HOST", "value": "tcp://127.0.0.1:2375"}],
-                        "command": [
-                            "sh", "-c",
-                            "docker info >/dev/null 2>&1; "
-                            "while [ $? -ne 0 ] ; do sleep 3; docker info >/dev/null 2>&1; done; "
-                            f"docker create -it --name=image-builder-container {job_in.from_image} sh; "
-                            f"docker start image-builder-container; "
-                            "while true; do sleep 86400; done"
-                        ]
-                    }
-                ],
-                "volumes": [
-                    {
+    replica = {
+        "spec": {
+            "containers": [
+                {
+                    "name": "dockerd",
+                    "image": "docker:stable-dind",
+                    "securityContext": {"privileged": True},
+                    "command": ["dockerd", "--host=tcp://0.0.0.0:2375"],
+                    "volumeMounts": [{
                         "name": "config-volume",
-                        "configMap": {
-                            "name": "docker-insecure-registries"
-                        }
+                        "mountPath": "/etc/docker/daemon.json",
+                        "subPath": "daemon.json"
+                    }]
+                },
+                {
+                    "name": "docker-cli",
+                    "image": "docker:stable",
+                    "env": [{"name": "DOCKER_HOST", "value": "tcp://127.0.0.1:2375"}],
+                    "command": [
+                        "sh", "-c",
+                        "docker info >/dev/null 2>&1; "
+                        "while [ $? -ne 0 ] ; do sleep 3; docker info >/dev/null 2>&1; done; "
+                        f"docker create -it --name=image-builder-container {job_in.from_image} sh; "
+                        f"docker start image-builder-container; "
+                        "while true; do sleep 86400; done"
+                    ]
+                }
+            ],
+            "volumes": [
+                {
+                    "name": "config-volume",
+                    "configMap": {
+                        "name": "docker-insecure-registries"
                     }
-                ]
-            }
+                }
+            ]
         }
-    }]
-    vcjob = {
-        "apiVersion": "batch.volcano.sh/v1alpha1",
-        "kind": "Job",
+    }
+    ptjob = {
+        "apiVersion": "pinta.qed.usc.edu/v1",
+        "kind": "PintaJob",
         "metadata": {
             "name": "pinta-job-" + str(id)
         },
         "spec": {
-            "minAvailable": 1,
-            "schedulerName": "volcano",
-            "plugins": {"env": [], "svc": []},
-            "policies": [{"event": "PodEvicted", "action": "RestartJob"}],
-            "tasks": tasks
+            "type": "image-builder",
+            "replica": replica,
+            "numReplicas": 1
         }
     }
     api_response = api.create_namespaced_custom_object(
-        group="batch.volcano.sh",
-        version="v1alpha1",
+        group="pinta.qed.usc.edu",
+        version="v1",
         namespace="default",
-        plural="jobs",
-        body=vcjob
+        plural="pintajobs",
+        body=ptjob
     )
     return api_response
 
@@ -280,10 +254,10 @@ def commit_image_builder(name: str, id: int, username: str):
     print("Response: " + resp)
     api = client.CustomObjectsApi()
     api_response = api.delete_namespaced_custom_object(
-        group="batch.volcano.sh",
-        version="v1alpha1",
+        group="pinta.qed.usc.edu",
+        version="v1",
         namespace="default",
-        plural="jobs",
+        plural="pintajobs",
         name="pinta-job-" + str(id)
     )
     return api_response

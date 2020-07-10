@@ -13,8 +13,8 @@ class CRUDJob(CRUDBase[Job, JobCreate, JobUpdate]):
         self, db: Session, *, obj_in: SymmetricJob, owner_id: int
     ) -> Job:
         db_obj = Job(name=obj_in.name, description=obj_in.description, type="symmetric", image=obj_in.image,
-                     working_dir=obj_in.working_dir, replica_command=obj_in.command,
-                     min_num_replicas=obj_in.min_num_replicas, max_num_replicas=obj_in.max_num_replicas,
+                     working_dir=obj_in.working_dir,
+                     replica_command=obj_in.command, num_replicas=obj_in.num_replicas,
                      ports=obj_in.ports, scheduled=obj_in.scheduled, owner_id=owner_id)
         db.add(db_obj)
         db.commit()
@@ -25,9 +25,9 @@ class CRUDJob(CRUDBase[Job, JobCreate, JobUpdate]):
         self, db: Session, *, obj_in: PSWorkerJob, owner_id: int
     ) -> Job:
         db_obj = Job(name=obj_in.name, description=obj_in.description, type="ps_worker", image=obj_in.image,
-                     working_dir=obj_in.working_dir, master_command=obj_in.ps_command,
-                     replica_command=obj_in.worker_command,
-                     min_num_replicas=obj_in.min_num_workers, max_num_replicas=obj_in.max_num_workers,
+                     working_dir=obj_in.working_dir,
+                     master_command=obj_in.ps_command, num_masters=obj_in.num_ps,
+                     replica_command=obj_in.worker_command, num_replicas=obj_in.num_workers,
                      ports=obj_in.ports, scheduled=obj_in.scheduled, owner_id=owner_id)
         db.add(db_obj)
         db.commit()
@@ -39,8 +39,7 @@ class CRUDJob(CRUDBase[Job, JobCreate, JobUpdate]):
     ) -> Job:
         db_obj = Job(name=obj_in.name, description=obj_in.description, type="mpi", image=obj_in.image,
                      working_dir=obj_in.working_dir, master_command=obj_in.master_command,
-                     replica_command=obj_in.replica_command,
-                     min_num_replicas=obj_in.min_num_replicas, max_num_replicas=obj_in.max_num_replicas,
+                     replica_command=obj_in.replica_command, num_replicas=obj_in.num_replicas,
                      ports=obj_in.ports, scheduled=obj_in.scheduled, owner_id=owner_id)
         db.add(db_obj)
         db.commit()
@@ -51,7 +50,7 @@ class CRUDJob(CRUDBase[Job, JobCreate, JobUpdate]):
         self, db: Session, *, obj_in: ImageBuilderJob, owner_id: int
     ) -> Job:
         db_obj = Job(name=obj_in.name, description=obj_in.description, type="image_builder", image=obj_in.from_image,
-                     min_num_replicas=1, max_num_replicas=1, scheduled=obj_in.scheduled, owner_id=owner_id)
+                     num_replicas=1, scheduled=obj_in.scheduled, owner_id=owner_id)
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
