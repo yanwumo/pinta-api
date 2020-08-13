@@ -20,7 +20,10 @@ def websocket_call_args(configuration, *args, **kwargs):
         apiClient.request method."""
 
     url = args[1]
-    # _request_timeout = kwargs.get("_request_timeout", 60)
+    headers = kwargs.get("headers")
+    extra_headers = None
+    if headers and 'authorization' in headers:
+        extra_headers = {"authorization": headers['authorization']}
 
     # Expand command parameter list to individual command params
     query_params = []
@@ -44,8 +47,9 @@ def websocket_call_args(configuration, *args, **kwargs):
     else:
         ssl_context.verify_mode = ssl.CERT_NONE
 
-    ssl_context.load_cert_chain(certfile=configuration.cert_file or None, keyfile=configuration.key_file or None)
-    return dict(uri=websocket_url, ssl=ssl_context, subprotocols=['v4.channel.k8s.io'])
+    if configuration.cert_file and configuration.key_file:
+        ssl_context.load_cert_chain(certfile=configuration.cert_file, keyfile=configuration.key_file)
+    return dict(uri=websocket_url, ssl=ssl_context, subprotocols=['v4.channel.k8s.io'], extra_headers=extra_headers)
 
 
 def stream(func, *args, **kwargs):
