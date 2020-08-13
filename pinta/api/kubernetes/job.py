@@ -46,6 +46,7 @@ def create_symmetric_pintajob(job_in: SymmetricJob, id: int):
         },
         "spec": {
             "type": "symmetric",
+            "volumes": job_in.volumes,
             "replica": replica,
             "numReplicas": job_in.num_replicas
         }
@@ -96,6 +97,7 @@ def create_ps_worker_pintajob(job_in: PSWorkerJob, id: int):
         },
         "spec": {
             "type": "ps-worker",
+            "volumes": job_in.volumes,
             "master": master,
             "replica": replica,
             "numMasters": job_in.num_ps,
@@ -148,6 +150,7 @@ def create_mpi_pintajob(job_in: MPIJob, id: int):
         },
         "spec": {
             "type": "mpi",
+            "volumes": job_in.volumes,
             "master": master,
             "replica": replica,
             "numMasters": 1,
@@ -216,6 +219,7 @@ def create_image_builder_pintajob(job_in: ImageBuilderJob, id: int):
         },
         "spec": {
             "type": "image-builder",
+            "volumes": job_in.volumes,
             "replica": replica,
             "numReplicas": 1
         }
@@ -261,3 +265,20 @@ def commit_image_builder(name: str, id: int, username: str):
         name="pinta-job-" + str(id)
     )
     return api_response
+
+
+def delete_vcjob(id: int):
+    if settings.K8S_DEBUG:
+        config.load_kube_config()
+    else:
+        config.load_incluster_config()
+    api = client.CustomObjectsApi()
+    api_response = api.delete_namespaced_custom_object(
+        group="pinta.qed.usc.edu",
+        version="v1",
+        namespace="default",
+        plural="pintajobs",
+        name="pinta-job-" + str(id)
+    )
+    return api_response
+

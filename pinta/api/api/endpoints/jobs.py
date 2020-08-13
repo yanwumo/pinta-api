@@ -6,11 +6,29 @@ from sqlalchemy.orm import Session
 from pinta.api import crud, models, schemas
 from pinta.api.api import deps
 
-from pinta.api.kubernetes.job import get_vcjob, create_symmetric_pintajob, create_ps_worker_pintajob, create_mpi_pintajob, create_image_builder_pintajob, commit_image_builder
+from pinta.api.kubernetes.job import get_vcjob, create_symmetric_pintajob, create_ps_worker_pintajob, \
+    create_mpi_pintajob, create_image_builder_pintajob, commit_image_builder, delete_vcjob
 from pinta.api.kubernetes.websocket import proxy
 from kubernetes.client.rest import ApiException
 
 router = APIRouter()
+
+
+def _translate_volumes(db: Session, volumes_in: str, current_user_id: int):
+    volumes_out = []
+    volumes_str = volumes_in.split(",")
+    for volume_str in volumes_str:
+        volume_str = volume_str.strip()
+        if volume_str == "":
+            continue
+        volume = crud.volume.get_by_owner_and_name(db, current_user_id=current_user_id, owner_and_name=volume_str)
+        if not volume:
+            raise HTTPException(status_code=404, detail=f"Volume {volume_str} does not exist")
+        volumes_out.append({
+            "mountPath": f"/volumes/{volume.name}",
+            "volumeClaimName": f"pinta-volume-{volume.id}",
+        })
+    return volumes_out
 
 
 @router.get("/", response_model=List[schemas.JobWithStatus])
@@ -72,6 +90,7 @@ def create_symmetric_job(
     job = crud.job.create_symmetric_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
+            job_in.volumes = _translate_volumes(db, job_in.volumes, current_user.id)
             create_symmetric_pintajob(job_in=job_in, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
@@ -93,6 +112,7 @@ def create_ps_worker_job(
     job = crud.job.create_ps_worker_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
+            job_in.volumes = _translate_volumes(db, job_in.volumes, current_user.id)
             create_ps_worker_pintajob(job_in=job_in, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
@@ -114,6 +134,7 @@ def create_mpi_job(
     job = crud.job.create_mpi_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
+            job_in.volumes = _translate_volumes(db, job_in.volumes, current_user.id)
             create_mpi_pintajob(job_in=job_in, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
@@ -135,6 +156,7 @@ def create_image_builder_job(
     job = crud.job.create_image_builder_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
+            job_in.volumes = _translate_volumes(db, job_in.volumes, current_user.id)
             create_image_builder_pintajob(job_in=job_in, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
@@ -163,7 +185,15 @@ def update_job(
         raise HTTPException(status_code=400, detail="Job already scheduled")
     if job_in.scheduled:
         try:
-            create_symmetric_pintajob(job_in=job_in, id=job.id)
+            job_in.volumes = _translate_volumes(db, job_in.volumes, current_user.id)
+            if job.type == "ps_worker":
+                create_ps_worker_pintajob(job_in=job, id=job.id)
+            elif job.type == "mpi":
+                create_mpi_pintajob(job_in=job, id=job.id)
+            elif job.type == "symmetric":
+                create_symmetric_pintajob(job_in=job, id=job.id)
+            elif job.type == "image_builder":
+                create_image_builder_pintajob(job_in=job, id=job.id)
         except ApiException as e:
             print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
             job_in.scheduled = False
@@ -218,6 +248,7 @@ def delete_job(
         raise HTTPException(status_code=404, detail="Job not found")
     if not crud.user.is_superuser(current_user) and (job.owner_id != current_user.id):
         raise HTTPException(status_code=400, detail="Not enough permissions")
+    delete_vcjob(id)
     job = crud.job.remove(db=db, id=id)
     return job
 
@@ -240,7 +271,15 @@ def schedule_job(
     if job.scheduled:
         raise HTTPException(status_code=400, detail="Job already scheduled")
     try:
-        create_symmetric_pintajob(job_in=job, id=job.id)
+        job.volumes = _translate_volumes(db, job.volumes, current_user.id)
+        if job.type == "ps_worker":
+            create_ps_worker_pintajob(job_in=job, id=job.id)
+        elif job.type == "mpi":
+            create_mpi_pintajob(job_in=job, id=job.id)
+        elif job.type == "symmetric":
+            create_symmetric_pintajob(job_in=job, id=job.id)
+        elif job.type == "image_builder":
+            create_image_builder_pintajob(job_in=job, id=job.id)
     except ApiException as e:
         print("Exception when calling CustomObjectsApi->create_cluster_custom_object: %s\n" % e)
         raise

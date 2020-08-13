@@ -16,6 +16,7 @@ class Job(Base):
     description = Column(String, index=True)
     type = Column(Enum(JobType))
     image = Column(String, index=True)
+    volumes = Column(String)
     working_dir = Column(String)
     master_command = Column(String)
     replica_command = Column(String)

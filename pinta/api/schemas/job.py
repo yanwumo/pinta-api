@@ -26,6 +26,10 @@ class SymmetricJobSpec(BaseModel):
                                         "tensorflow/tensorflow), or an image that is created and stored in the "
                                         "system.")
     from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
+    volumes: str = Field(..., description="A list of volume names that are attached to the job, separated by comma. "
+                                          "It can be a combination of private volumes created by the user "
+                                          "(e.g. mnist), and/or volumes shared publicly by other users "
+                                          "(e.g. admin/imagenet).")
     working_dir: str = Field(..., description="Working directory when running the command.")
     command: str = Field(..., description="Command to run.")
     num_replicas: int
@@ -52,6 +56,10 @@ class PSWorkerJobSpec(BaseModel):
                                         "tensorflow/tensorflow), or an image that is created and stored in the "
                                         "system.")
     from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
+    volumes: str = Field(..., description="A list of volume names that are attached to the job, separated by comma. "
+                                          "It can be a combination of private volumes created by the user "
+                                          "(e.g. mnist), and/or volumes shared publicly by other users "
+                                          "(e.g. admin/imagenet).")
     working_dir: str = Field(..., description="Working directory when running the command.")
     ps_command: str = Field(..., description="Command to run on parameter server.")
     worker_command: str = Field(..., description="Command to run on worker.")
@@ -79,6 +87,10 @@ class MPIJobSpec(BaseModel):
                                         "tensorflow/tensorflow), or an image that is created and stored in the "
                                         "system.")
     from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
+    volumes: str = Field(..., description="A list of volume names that are attached to the job, separated by comma. "
+                                          "It can be a combination of private volumes created by the user "
+                                          "(e.g. mnist), and/or volumes shared publicly by other users "
+                                          "(e.g. admin/imagenet).")
     working_dir: str = Field(..., description="Working directory when running the command.")
     master_command: str = Field(..., description="Command to run on master.")
     replica_command: str = Field(..., description="Command to run on replica.")
@@ -104,6 +116,10 @@ class ImageBuilderJobSpec(BaseModel):
                                              "image from a publicly available repository (e.g., alpine:latest, "
                                              "tensorflow/tensorflow), or an image that is created and stored in the "
                                              "system.")
+    volumes: str = Field(..., description="A list of volume names that are attached to the job, separated by comma. "
+                                          "It can be a combination of private volumes created by the user "
+                                          "(e.g. mnist), and/or volumes shared publicly by other users "
+                                          "(e.g. admin/imagenet).")
     scheduled: bool = True
 
 
@@ -141,6 +157,10 @@ class JobInDBBase(BaseModel):
                                         "image from a publicly available repository (e.g., alpine:latest, "
                                         "tensorflow/tensorflow), or an image that is created and stored in the "
                                         "system.")
+    volumes: Optional[str] = Field(None, description="A list of volume names that are attached to the job, separated by comma. "
+                                          "It can be a combination of private volumes created by the user "
+                                          "(e.g. mnist), and/or volumes shared publicly by other users "
+                                          "(e.g. admin/imagenet).")
     working_dir: Optional[str] = Field(None, description="Working directory when running the command.")
     master_command: Optional[str] = None
     replica_command: Optional[str] = None
