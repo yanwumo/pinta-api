@@ -243,8 +243,8 @@ def commit_image_builder(name: str, id: int, username: str):
     exec_command = [
         "/bin/sh",
         "-c",
-        f"docker commit image-builder-container registry-service.pinta-system.svc:5000/{username}/{name}; "
-        f"docker push registry-service.pinta-system.svc:5000/{username}/{name}"
+        f"docker commit image-builder-container {settings.REGISTRY_SERVER}/{username}/{name}; "
+        f"docker push {settings.REGISTRY_SERVER}/{username}/{name}"
     ]
     resp = stream(
         func=api.connect_get_namespaced_pod_exec,

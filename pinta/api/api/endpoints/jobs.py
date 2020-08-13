@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from pinta.api import crud, models, schemas
 from pinta.api.api import deps
+from pinta.api.core.config import settings
 
 from pinta.api.kubernetes.job import get_vcjob, create_symmetric_pintajob, create_ps_worker_pintajob, \
     create_mpi_pintajob, create_image_builder_pintajob, commit_image_builder, delete_vcjob
@@ -336,8 +337,8 @@ async def commit_image_builder_job(
                 "/bin/sh",
                 "-c",
                 "docker login; "
-                f"docker commit image-builder-container registry-service.pinta-system.svc:5000/{current_user.full_name}/{image_name}; "
-                f"docker push registry-service.pinta-system.svc:5000/{current_user.full_name}/{image_name}"
+                f"docker commit image-builder-container {settings.REGISTRY_SERVER}/{current_user.username}/{image_name}; "
+                f"docker push {settings.REGISTRY_SERVER}/{current_user.username}/{image_name}"
             ],
             tty=True
         )
@@ -371,7 +372,7 @@ def commit_job(
         raise HTTPException(status_code=400, detail="Job is not an image builder")
     if not job.scheduled:
         raise HTTPException(status_code=400, detail="Image builder job not scheduled")
-    commit_image_builder(name=image_name, id=id, username=current_user.email)
+    commit_image_builder(name=image_name, id=id, username=current_user.username)
     job = crud.job.remove(db=db, id=id)
     return job
 
@@ -408,6 +409,16 @@ async def exec_job(
                     "/bin/sh",
                     "-c",
                     f"docker exec -i{'t' if tty else ''} image-builder-container {command}; exit"
+                ],
+                tty=tty
+            )
+        elif job.type == "ps_worker":
+            args = dict(
+                pod=f"pinta-job-{id}-worker-0",
+                command=[
+                    "/bin/sh",
+                    "-c",
+                    command
                 ],
                 tty=tty
             )
