@@ -19,3 +19,4 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
     jobs = relationship("Job", back_populates="owner")
     volumes = relationship("Volume", back_populates="owner")
+    images = relationship("Image", back_populates="owner")

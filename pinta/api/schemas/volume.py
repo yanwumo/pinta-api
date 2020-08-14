@@ -8,6 +8,7 @@ class VolumeBase(BaseModel):
     name: Optional[str] = Field(None, description="Volume name.")
     description: Optional[str] = Field(None, description="Volume description.")
     capacity: Optional[str] = Field(None, description="Volume capacity.")
+    is_public: bool = Field(False, description="Indicates if the volume is available for other users to use.")
 
 
 # Properties to receive on volume creation

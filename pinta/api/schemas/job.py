@@ -116,6 +116,7 @@ class ImageBuilderJobSpec(BaseModel):
                                              "image from a publicly available repository (e.g., alpine:latest, "
                                              "tensorflow/tensorflow), or an image that is created and stored in the "
                                              "system.")
+    from_private: bool = Field(True, description="Set to true if fetch the image from local registry.")
     volumes: str = Field(..., description="A list of volume names that are attached to the job, separated by comma. "
                                           "It can be a combination of private volumes created by the user "
                                           "(e.g. mnist), and/or volumes shared publicly by other users "

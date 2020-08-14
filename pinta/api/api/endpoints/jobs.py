@@ -32,6 +32,16 @@ def _translate_volumes(db: Session, volumes_in: str, current_user_id: int):
     return volumes_out
 
 
+def _translate_image(db: Session, image_in: str, current_user: models.User):
+    image = crud.image.get_by_owner_and_name(db, current_user_id=current_user.id, owner_and_name=image_in)
+    if not image:
+        raise HTTPException(status_code=404, detail=f"Image {image_in} does not exist")
+    if len(image_in.split("/")) == 1:
+        return f"localhost:30007/{current_user.username}/{image_in}"
+    else:
+        return f"localhost:30007/{settings.REGISTRY_SERVER}/{image_in}"
+
+
 @router.get("/", response_model=List[schemas.JobWithStatus])
 def read_jobs(
     db: Session = Depends(deps.get_db),
@@ -88,6 +98,8 @@ def create_symmetric_job(
     """
     Create a new job with symmetric node configurations.
     """
+    if job_in.from_private:
+        job_in.image = _translate_image(db, job_in.image, current_user)
     job = crud.job.create_symmetric_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
@@ -110,6 +122,8 @@ def create_ps_worker_job(
     """
     Create a new job with parameter server and workers.
     """
+    if job_in.from_private:
+        job_in.image = _translate_image(db, job_in.image, current_user)
     job = crud.job.create_ps_worker_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
@@ -132,6 +146,8 @@ def create_mpi_job(
     """
     Create a new job with master and replica node configurations, which are typically used by MPI.
     """
+    if job_in.from_private:
+        job_in.image = _translate_image(db, job_in.image, current_user)
     job = crud.job.create_mpi_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
@@ -154,6 +170,8 @@ def create_image_builder_job(
     """
     Create a new job which builds a new image.
     """
+    if job_in.from_private:
+        job_in.from_image = _translate_image(db, job_in.from_image, current_user)
     job = crud.job.create_image_builder_job_with_owner(db=db, obj_in=job_in, owner_id=current_user.id)
     if job_in.scheduled:
         try:
@@ -336,7 +354,6 @@ async def commit_image_builder_job(
             command=[
                 "/bin/sh",
                 "-c",
-                "docker login; "
                 f"docker commit image-builder-container {settings.REGISTRY_SERVER}/{current_user.username}/{image_name}; "
                 f"docker push {settings.REGISTRY_SERVER}/{current_user.username}/{image_name}"
             ],
@@ -345,6 +362,13 @@ async def commit_image_builder_job(
         await proxy(websocket, **args)
         await websocket.close()
 
+        image = crud.image.create_with_owner(
+            db=db,
+            obj_in=schemas.ImageCreate(
+                name=image_name
+            ),
+            owner_id=current_user.id)
+        delete_vcjob(id)
         job = crud.job.remove(db=db, id=id)
     except HTTPException as e:
         # Redirect HTTPException information to channel 3 (ERROR_CHANNEL)
@@ -373,8 +397,16 @@ def commit_job(
     if not job.scheduled:
         raise HTTPException(status_code=400, detail="Image builder job not scheduled")
     commit_image_builder(name=image_name, id=id, username=current_user.username)
+
+    image = crud.image.create_with_owner(
+        db=db,
+        obj_in=schemas.ImageCreate(
+            name=image_name
+        ),
+        owner_id=current_user.id)
+    delete_vcjob(id)
     job = crud.job.remove(db=db, id=id)
-    return job
+    return image
 
 
 @router.websocket("/{id}/exec")

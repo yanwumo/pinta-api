@@ -35,7 +35,8 @@ def create_symmetric_pintajob(job_in: SymmetricJob, id: int):
                 "workingDir": job_in.working_dir,
                 "command": ["sh", "-c", job_in.command],
                 "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-            }]
+            }],
+            "restartPolicy": "OnFailure"
         }
     }
     ptjob = {
@@ -75,7 +76,8 @@ def create_ps_worker_pintajob(job_in: PSWorkerJob, id: int):
                 "workingDir": job_in.working_dir,
                 "command": ["sh", "-c", job_in.ps_command],
                 "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-            }]
+            }],
+            "restartPolicy": "OnFailure"
         }
     }
     replica = {
@@ -86,7 +88,8 @@ def create_ps_worker_pintajob(job_in: PSWorkerJob, id: int):
                 "workingDir": job_in.working_dir,
                 "command": ["sh", "-c", job_in.worker_command],
                 "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-            }]
+            }],
+            "restartPolicy": "OnFailure"
         }
     }
     ptjob = {
@@ -128,7 +131,8 @@ def create_mpi_pintajob(job_in: MPIJob, id: int):
                 "workingDir": job_in.working_dir,
                 "command": ["sh", "-c", job_in.master_command],
                 "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-            }]
+            }],
+            "restartPolicy": "OnFailure"
         }
     }
     replica = {
@@ -139,7 +143,8 @@ def create_mpi_pintajob(job_in: MPIJob, id: int):
                 "workingDir": job_in.working_dir,
                 "command": ["sh", "-c", job_in.replica_command],
                 "ports": [{"containerPort": 2222, "name": "pinta-job-port"}]
-            }]
+            }],
+            "restartPolicy": "OnFailure"
         }
     }
     ptjob = {
