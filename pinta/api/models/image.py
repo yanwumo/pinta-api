@@ -10,9 +10,12 @@ if TYPE_CHECKING:
 
 
 class Image(Base):
+    __tablename__ = "images"
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     description = Column(String, index=True)
     is_public = Column(Boolean)
-    owner_id = Column(Integer, ForeignKey("user.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
     owner = relationship("User", back_populates="images")

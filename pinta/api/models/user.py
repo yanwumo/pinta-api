@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
 
 class User(Base):
+    __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, index=True)
@@ -17,6 +19,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+
     jobs = relationship("Job", back_populates="owner")
     volumes = relationship("Volume", back_populates="owner")
     images = relationship("Image", back_populates="owner")

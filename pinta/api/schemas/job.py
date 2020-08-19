@@ -5,14 +5,34 @@ from pydantic import BaseModel, Field
 
 
 class JobType(str, Enum):
-    ps_worker = "ps_worker"
+    ps_worker = "ps-worker"
     mpi = "mpi"
     symmetric = "symmetric"
-    image_builder = "image_builder"
+    image_builder = "image-builder"
+
+    @classmethod
+    def master_role(cls, type):
+        d = {
+            cls.ps_worker: "ps",
+            cls.mpi: "master",
+            cls.symmetric: None,
+            cls.image_builder: None
+        }
+        return d[type]
+
+    @classmethod
+    def replica_role(cls, type):
+        d = {
+            cls.ps_worker: "worker",
+            cls.mpi: "replica",
+            cls.symmetric: "replica",
+            cls.image_builder: "image-builder"
+        }
+        return d[type]
 
 
 # Shared properties
-class JobBase(BaseModel):
+class BaseSpec(BaseModel):
     name: str = Field(..., description="Job name.")
     description: Optional[str] = Field(None, description="Job description.")
 
@@ -34,17 +54,39 @@ class SymmetricJobSpec(BaseModel):
     command: str = Field(..., description="Command to run.")
     num_replicas: int
     ports: str = Field(..., description="Ports to expose.")
-    scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to change"
+    schedule: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to change"
                                               "later on. If set to true, job will be immediately queued to the system, "
                                               "waiting to be scheduled.")
 
 
-class SymmetricJob(SymmetricJobSpec, JobBase):
+class SymmetricJob(SymmetricJobSpec, BaseSpec):
     """
     All nodes in a symmetric job have identical configuration,
     with the only difference being node index.
     """
-    pass
+    @property
+    def type(self):
+        return JobType.symmetric
+
+    @property
+    def master_command(self):
+        return None
+
+    @property
+    def replica_command(self):
+        return self.command
+
+    @property
+    def num_masters(self):
+        return None
+
+    @property
+    def num_replicas(self):
+        return self.num_replicas
+
+    @property
+    def scheduled(self):
+        return self.schedule
 
 
 class PSWorkerJobSpec(BaseModel):
@@ -66,16 +108,38 @@ class PSWorkerJobSpec(BaseModel):
     num_ps: int
     num_workers: int
     ports: str = Field(..., description="Ports to expose.")
-    scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
+    schedule: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
                                               "change later on. If set to true, job will be immediately queued to "
                                               "the system, waiting to be scheduled.")
 
 
-class PSWorkerJob(PSWorkerJobSpec, JobBase):
+class PSWorkerJob(PSWorkerJobSpec, BaseSpec):
     """
     There are two types of nodes in a ps-worker job: parameter server and worker.
     """
-    pass
+    @property
+    def type(self):
+        return JobType.ps_worker
+
+    @property
+    def master_command(self):
+        return self.ps_command
+
+    @property
+    def replica_command(self):
+        return self.worker_command
+
+    @property
+    def num_masters(self):
+        return self.num_ps
+
+    @property
+    def num_replicas(self):
+        return self.num_workers
+
+    @property
+    def scheduled(self):
+        return self.schedule
 
 
 class MPIJobSpec(BaseModel):
@@ -96,16 +160,26 @@ class MPIJobSpec(BaseModel):
     replica_command: str = Field(..., description="Command to run on replica.")
     num_replicas: int
     ports: str = Field(..., description="Ports to expose.")
-    scheduled: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
+    schedule: bool = Field(True, description="If set to false, job will be put into pending state. Use PATCH to "
                                               "change later on. If set to true, job will be immediately queued to "
                                               "the system, waiting to be scheduled.")
 
 
-class MPIJob(MPIJobSpec, JobBase):
+class MPIJob(MPIJobSpec, BaseSpec):
     """
     There are two types of nodes in an MPI job: master and replicas.
     """
-    pass
+    @property
+    def type(self):
+        return JobType.mpi
+
+    @property
+    def num_masters(self):
+        return 1
+
+    @property
+    def scheduled(self):
+        return self.schedule
 
 
 class ImageBuilderJobSpec(BaseModel):
@@ -121,20 +195,58 @@ class ImageBuilderJobSpec(BaseModel):
                                           "It can be a combination of private volumes created by the user "
                                           "(e.g. mnist), and/or volumes shared publicly by other users "
                                           "(e.g. admin/imagenet).")
-    scheduled: bool = True
+    schedule: bool = True
 
 
-class ImageBuilderJob(ImageBuilderJobSpec, JobBase):
+class ImageBuilderJob(ImageBuilderJobSpec, BaseSpec):
     """
     An image builder job starts an instance using the specified base image. User can install packages,
     include files, and testrun code based on their needs. User packs the modified image and commits it
     to the local registry, so that the image can be used towards the real workload later on.
     """
-    pass
+    @property
+    def type(self):
+        return JobType.image_builder
+
+    @property
+    def image(self):
+        return self.from_image
+
+    @image.setter
+    def image(self, value):
+        self.from_image = value
+
+    @property
+    def working_dir(self):
+        return None
+
+    @property
+    def master_command(self):
+        return None
+
+    @property
+    def replica_command(self):
+        return None
+
+    @property
+    def num_masters(self):
+        return None
+
+    @property
+    def num_replicas(self):
+        return 1
+
+    @property
+    def ports(self):
+        return None
+
+    @property
+    def scheduled(self):
+        return self.schedule
 
 
 # Properties to receive on item creation
-class JobCreate(JobBase):
+class JobCreate(BaseSpec):
     type: JobType
     spec: Union[SymmetricJobSpec, ImageBuilderJobSpec]
 

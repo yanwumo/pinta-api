@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class Job(Base):
+    __tablename__ = "jobs"
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     description = Column(String, index=True)
@@ -19,10 +21,11 @@ class Job(Base):
     volumes = Column(String)
     working_dir = Column(String)
     master_command = Column(String)
-    replica_command = Column(String)
     num_masters = Column(Integer)
+    replica_command = Column(String)
     num_replicas = Column(Integer)
     ports = Column(String)
     scheduled = Column(Boolean)
-    owner_id = Column(Integer, ForeignKey("user.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
     owner = relationship("User", back_populates="jobs")
